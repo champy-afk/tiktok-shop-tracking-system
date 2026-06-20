@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Shop 追跡番号反映システム</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f6f8;
+      color: #17202d;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    }
+    header {
+      padding: 20px 28px;
+      background: #17202d;
+      color: #fff;
+      border-bottom: 4px solid #00a389;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    main {
+      width: min(1280px, calc(100% - 28px));
+      margin: 20px auto 36px;
+      display: grid;
+      gap: 14px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 8px 22px rgba(23, 32, 45, 0.06);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 7px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    input {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 9px 10px;
+      background: #fff;
+      color: #17202d;
+      font: inherit;
+      font-weight: 400;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      min-height: 42px;
+      padding: 10px 16px;
+      background: #00a389;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    button.secondary { background: #334155; }
+    button:disabled {
+      background: #aab4c3;
+      cursor: not-allowed;
+    }
+    .status {
+      min-height: 46px;
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: #eef2f7;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .status.error {
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      color: #be123c;
+    }
+    .status.success {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #047857;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f8fafc;
+      min-height: 70px;
+    }
+    .metric b {
+      display: block;
+      font-size: 23px;
+      line-height: 1.1;
+    }
+    .metric span {
+      display: block;
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    .table-wrap {
+      overflow: auto;
+      max-height: 540px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1320px;
+      background: #fff;
+    }
+    th, td {
+      border-bottom: 1px solid #e5e9f0;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #f1f5f9;
+      color: #334155;
+      z-index: 1;
+    }
+    td.message { white-space: normal; min-width: 240px; max-width: 420px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 72px;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .matched { background: #dcfce7; color: #166534; }
+    .error-pill { background: #fee2e2; color: #991b1b; }
+    .dry-run { background: #e0f2fe; color: #075985; }
+    .submitted { background: #ccfbf1; color: #115e59; }
+    .pending { background: #e2e8f0; color: #475569; }
+    .select-cell {
+      text-align: center;
+      width: 44px;
+    }
+    input[type="checkbox"] {
+      width: 16px;
+      min-height: 16px;
+      margin: 0;
+      accent-color: #00a389;
+    }
+    .hidden { display: none; }
+    @media (max-width: 920px) {
+      header { padding: 18px 16px; }
+      main { width: calc(100% - 20px); }
+      .grid, .summary { grid-template-columns: 1fr; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TikTok Shop 追跡番号反映システム</h1>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="grid">
+        <label>
+          TikTok Shop注文CSV
+          <input id="ordersCsv" type="file" accept=".csv,text/csv">
+        </label>
+        <label>
+          宅急便コンパクト以上PDF
+          <input id="shippingPdfs" type="file" accept=".pdf,application/pdf" multiple>
+        </label>
+        <label>
+          ネコポスPDF
+          <input id="nekoposPdfs" type="file" accept=".pdf,application/pdf" multiple>
+        </label>
+        <label>
+          X列の開始日時
+          <input id="startAt" type="datetime-local">
+        </label>
+        <label>
+          X列の終了日時
+          <input id="endAt" type="datetime-local">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="previewBtn">照合する</button>
+        <button id="submitBtn" class="secondary" disabled>APIへ送信</button>
+      </div>
+    </section>
+
+    <section id="status" class="status">CSVとPDFを選択してください。</section>
+
+    <section id="summaryPanel" class="panel hidden">
+      <div class="summary">
+        <div class="metric"><b id="metricTotal">0</b><span>CSV注文行</span></div>
+        <div class="metric"><b id="metricTarget">0</b><span>範囲内の対象</span></div>
+        <div class="metric"><b id="metricMatched">0</b><span>追跡番号一致</span></div>
+        <div class="metric"><b id="metricErrors">0</b><span>個別エラー</span></div>
+        <div class="metric"><b id="metricShipments">0</b><span>PDF内追跡番号</span></div>
+        <div class="metric"><b id="metricPackage">0</b><span>package_idあり</span></div>
+      </div>
+    </section>
+
+    <section id="resultPanel" class="panel hidden">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="select-cell"><input id="selectAll" type="checkbox" aria-label="全選択"></th>
+              <th>状態</th>
+              <th>注文ID</th>
+              <th>Package ID</th>
+              <th>X列日時</th>
+              <th>追跡番号</th>
+              <th>PDF位置</th>
+              <th>受取人</th>
+              <th>電話番号</th>
+              <th>スコア</th>
+              <th>確認</th>
+              <th>詳細</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const els = {
+      ordersCsv: document.getElementById('ordersCsv'),
+      shippingPdfs: document.getElementById('shippingPdfs'),
+      nekoposPdfs: document.getElementById('nekoposPdfs'),
+      startAt: document.getElementById('startAt'),
+      endAt: document.getElementById('endAt'),
+      previewBtn: document.getElementById('previewBtn'),
+      submitBtn: document.getElementById('submitBtn'),
+      status: document.getElementById('status'),
+      summaryPanel: document.getElementById('summaryPanel'),
+      resultPanel: document.getElementById('resultPanel'),
+      resultBody: document.getElementById('resultBody'),
+      metricTotal: document.getElementById('metricTotal'),
+      metricTarget: document.getElementById('metricTarget'),
+      metricMatched: document.getElementById('metricMatched'),
+      metricErrors: document.getElementById('metricErrors'),
+      metricShipments: document.getElementById('metricShipments'),
+      metricPackage: document.getElementById('metricPackage')
+    };
+
+    let currentOrders = [];
+    const selectedOrderIds = new Set();
+
+    function orderKey(order) {
+      return `${order.orderId || ''}|${order.trackingNumber || ''}|${order.packageId || ''}`;
+    }
+
+    function setStatus(message, type = '') {
+      els.status.textContent = message;
+      els.status.className = `status ${type}`.trim();
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function statusLabel(status) {
+      const labels = {
+        matched: ['一致', 'matched'],
+        error: ['エラー', 'error-pill'],
+        dry_run: ['ドライラン', 'dry-run'],
+        submitted: ['反映済み', 'submitted'],
+        pending: ['待機', 'pending']
+      };
+      return labels[status] || [status || '未処理', 'pending'];
+    }
+
+    function renderOrders(orders) {
+      els.resultBody.innerHTML = '';
+      orders.forEach(order => {
+        const [label, className] = statusLabel(order.status);
+        const key = orderKey(order);
+        const selectable = order.status === 'matched';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="select-cell"><input class="row-select" type="checkbox" data-key="${escapeHtml(key)}" ${selectedOrderIds.has(key) ? 'checked' : ''} ${selectable ? '' : 'disabled'} aria-label="送信対象"></td>
+          <td><span class="pill ${className}">${escapeHtml(label)}</span></td>
+          <td>${escapeHtml(order.orderId || '')}</td>
+          <td>${escapeHtml(order.packageId || '')}</td>
+          <td>${escapeHtml(order.specifiedValue || '')}</td>
+          <td>${escapeHtml(order.trackingNumber || '')}</td>
+          <td>${escapeHtml(order.pdfPosition || '')}</td>
+          <td>${escapeHtml(order.recipient || '')}</td>
+          <td>${escapeHtml(order.phone || '')}</td>
+          <td>${escapeHtml(String(order.score || 0))}</td>
+          <td>${escapeHtml(order.verificationMessage || '')}</td>
+          <td class="message">${escapeHtml(order.message || '')}</td>
+        `;
+        els.resultBody.appendChild(tr);
+      });
+      syncSelectAll();
+      els.resultPanel.classList.remove('hidden');
+    }
+
+    function syncSelectAll() {
+      const selectAll = document.getElementById('selectAll');
+      const selectable = currentOrders.filter(order => order.status === 'matched');
+      if (!selectAll) return;
+      selectAll.disabled = selectable.length === 0;
+      selectAll.checked = selectable.length > 0 && selectable.every(order => selectedOrderIds.has(orderKey(order)));
+      selectAll.indeterminate = selectable.some(order => selectedOrderIds.has(orderKey(order))) && !selectAll.checked;
+      els.submitBtn.disabled = selectedOrderIds.size === 0;
+    }
+
+    function renderSummary(data) {
+      els.metricTotal.textContent = data.summary?.totalRows ?? 0;
+      els.metricTarget.textContent = data.summary?.target ?? 0;
+      els.metricMatched.textContent = data.summary?.matched ?? 0;
+      els.metricErrors.textContent = data.summary?.errors ?? 0;
+      els.metricShipments.textContent = data.shipmentCount ?? 0;
+      els.metricPackage.textContent = data.summary?.packageIdReady ?? 0;
+      els.summaryPanel.classList.remove('hidden');
+    }
+
+    async function preview() {
+      const csv = els.ordersCsv.files[0];
+      const pdfs = Array.from(els.shippingPdfs.files);
+      const nekoposPdfs = Array.from(els.nekoposPdfs.files);
+      if (!csv) return setStatus('TikTok Shop注文CSVを選択してください。', 'error');
+      if (!pdfs.length && !nekoposPdfs.length) return setStatus('宅急便コンパクト以上PDFまたはネコポスPDFを選択してください。', 'error');
+      if (els.startAt.value && els.endAt.value && els.startAt.value > els.endAt.value) return setStatus('開始日時は終了日時より前にしてください。', 'error');
+
+      const form = new FormData();
+      form.append('ordersCsv', csv);
+      pdfs.forEach(file => form.append('shippingPdfs', file));
+      nekoposPdfs.forEach(file => form.append('nekoposPdfs', file));
+      form.append('startAt', els.startAt.value || '');
+      form.append('endAt', els.endAt.value || '');
+
+      els.previewBtn.disabled = true;
+      els.submitBtn.disabled = true;
+      setStatus('CSVとPDFを照合しています。');
+
+      try {
+        const response = await fetch('/api/preview', { method: 'POST', body: form });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '照合に失敗しました。');
+
+        currentOrders = data.orders || [];
+        selectedOrderIds.clear();
+        renderSummary(data);
+        renderOrders(currentOrders);
+        els.submitBtn.disabled = true;
+        const packageText = data.packageLookupError ? ` package_id取得エラー: ${data.packageLookupError}` : '';
+        setStatus(`照合完了: ${data.summary.matched}件一致、${data.summary.errors}件エラー。送信前に一覧を確認してください。${packageText}`, data.summary.errors || data.packageLookupError ? '' : 'success');
+      } catch (err) {
+        currentOrders = [];
+        setStatus(err.message, 'error');
+      } finally {
+        els.previewBtn.disabled = false;
+      }
+    }
+
+    async function submitTracking() {
+      const matched = currentOrders.filter(order => order.status === 'matched' && selectedOrderIds.has(orderKey(order)));
+      if (!matched.length) return setStatus('反映できる一致済み注文がありません。', 'error');
+
+      els.previewBtn.disabled = true;
+      els.submitBtn.disabled = true;
+      setStatus('TikTok Shop API送信処理を実行しています。');
+
+      try {
+        const response = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: matched })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'API送信に失敗しました。');
+
+        const resultByOrderId = new Map((data.results || []).map(order => [order.orderId, order]));
+        currentOrders = currentOrders.map(order => resultByOrderId.get(order.orderId) || order);
+        selectedOrderIds.clear();
+        renderOrders(currentOrders);
+        const mode = data.dryRun ? 'ドライラン完了。TikTok Shopには未反映です。' : 'API反映が完了しました。';
+        setStatus(`${mode} 反映済み: ${data.summary.submitted}件 / ドライラン: ${data.summary.dryRun}件 / エラー: ${data.summary.errors}件`, data.summary.errors ? '' : 'success');
+      } catch (err) {
+        setStatus(err.message, 'error');
+      } finally {
+        els.previewBtn.disabled = false;
+        syncSelectAll();
+      }
+    }
+
+    els.previewBtn.addEventListener('click', preview);
+    els.submitBtn.addEventListener('click', submitTracking);
+    els.resultBody.addEventListener('change', event => {
+      if (!event.target.classList.contains('row-select')) return;
+      const key = event.target.dataset.key;
+      if (event.target.checked) selectedOrderIds.add(key);
+      else selectedOrderIds.delete(key);
+      syncSelectAll();
+    });
+    document.getElementById('selectAll').addEventListener('change', event => {
+      const checked = event.target.checked;
+      currentOrders
+        .filter(order => order.status === 'matched')
+        .forEach(order => {
+          const key = orderKey(order);
+          if (checked) selectedOrderIds.add(key);
+          else selectedOrderIds.delete(key);
+        });
+      renderOrders(currentOrders);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: tiktok-shop-tracking-system
+    env: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TIKTOK_SHOP_DRY_RUN
+        sync: false
+      - key: TTS_APP_KEY
+        sync: false
+      - key: TTS_APP_SECRET
+        sync: false
+      - key: TTS_AUTH_CODE
+        sync: false
+      - key: TTS_ACCESS_TOKEN
+        sync: false
+      - key: TTS_REFRESH_TOKEN
+        sync: false
+      - key: TTS_SHOP_CIPHER
+        sync: false
+      - key: TTS_API_BASE_URL
+        value: https://open-api.tiktokglobalshop.com
+      - key: TTS_SHIP_ENDPOINT_PATH
+        value: /fulfillment/202309/packages/{package_id}/ship
+      - key: TTS_STATUS_ENDPOINT_PATH
+        sync: false
+      - key: TTS_SHIPPING_PROVIDER_ID
+        sync: false
+      - key: CSV_DATE_COLUMN_INDEX
+        value: "23"
+      - key: CSV_PACKAGE_ID_LABELS
+        value: Package ID,PackageID,パッケージID
