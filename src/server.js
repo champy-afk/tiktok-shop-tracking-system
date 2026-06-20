@@ -76,6 +76,21 @@ async function enrichPackageIds(orders) {
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+app.get('/', (req, res, next) => {
+  const fallbackFiles = [
+    path.join(__dirname, '..', 'public', 'index.html'),
+    path.join(__dirname, '..', 'index.html')
+  ];
+  const sendFallback = index => {
+    if (index >= fallbackFiles.length) return next();
+    return res.sendFile(fallbackFiles[index], err => {
+      if (!err) return undefined;
+      return sendFallback(index + 1);
+    });
+  };
+  return sendFallback(0);
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
