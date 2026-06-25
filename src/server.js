@@ -101,6 +101,7 @@ app.get('/api/config-status', (req, res) => {
     hasAppKey: Boolean(config.tiktok.appKey),
     hasAuthCode: Boolean(config.tiktok.authCode),
     hasAccessToken: Boolean(config.tiktok.accessToken),
+    hasRefreshToken: Boolean(config.tiktok.refreshToken),
     hasShopCipher: Boolean(config.tiktok.shopCipher),
     hasShippingProviderId: Boolean(config.tiktok.shippingProviderId),
     hasShipEndpointPath: Boolean(config.tiktok.shipEndpointPath),
@@ -166,7 +167,8 @@ app.post('/api/preview', upload.fields([
 app.post('/api/submit', async (req, res) => {
   try {
     const orders = Array.isArray(req.body?.orders) ? req.body.orders : [];
-    const matchedOrders = orders.filter(order => order.status === 'matched' && order.orderId && order.trackingNumber);
+    const enrichedOrders = await enrichPackageIds(orders);
+    const matchedOrders = enrichedOrders.filter(order => order.status === 'matched' && order.orderId && order.trackingNumber);
     if (!matchedOrders.length) return res.status(400).json({ error: 'API反映できる一致済み注文がありません。' });
 
     const results = [];

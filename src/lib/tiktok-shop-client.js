@@ -45,6 +45,13 @@ function buildShipmentPayload(order, shippingProviderId) {
   };
 }
 
+function isTokenError(data, response) {
+  const text = `${data?.message || ''} ${data?.msg || ''}`.toLowerCase();
+  return response.status === 401 ||
+    response.status === 403 ||
+    /token|access_token|expired|invalid credential|authorization/.test(text);
+}
+
 function findTrackingStatus(value) {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string') {
@@ -77,6 +84,37 @@ class TikTokShopClient {
     this.config = config;
   }
 
+  async refreshAccessToken() {
+    if (!this.config.appKey || !this.config.appSecret || !this.config.refreshToken) {
+      throw new Error('アクセストークン更新に必要な設定が不足しています: TTS_REFRESH_TOKEN');
+    }
+
+    const url = new URL('https://auth.tiktok-shops.com/api/v2/token/refresh');
+    url.searchParams.set('app_key', this.config.appKey);
+    url.searchParams.set('app_secret', this.config.appSecret);
+    url.searchParams.set('refresh_token', this.config.refreshToken);
+    url.searchParams.set('grant_type', 'refresh_token');
+
+    const response = await fetch(url);
+    const text = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`アクセストークン更新レスポンスをJSONとして読めません (${response.status}): ${text}`);
+    }
+    if (!response.ok || (data.code && data.code !== 0)) {
+      throw new Error(`アクセストークン更新エラー (${response.status}/${data.code ?? ''}): ${data.message || data.msg || text}`);
+    }
+
+    const tokenData = data.data || data;
+    if (!tokenData.access_token) throw new Error('アクセストークン更新レスポンスにaccess_tokenがありません');
+
+    this.config.accessToken = tokenData.access_token;
+    if (tokenData.refresh_token) this.config.refreshToken = tokenData.refresh_token;
+    return tokenData;
+  }
+
   validateConfig() {
     const missing = [];
     if (!this.config.appKey) missing.push('TTS_APP_KEY');
@@ -100,7 +138,7 @@ class TikTokShopClient {
     }, this.config.appSecret);
   }
 
-  async getJson(pathTemplate, pathParams = {}, extraQuery = {}) {
+  async getJson(pathTemplate, pathParams = {}, extraQuery = {}, options = {}) {
     const url = this.signedGetUrl(pathTemplate, pathParams, extraQuery);
     const response = await fetch(url, {
       method: 'GET',
@@ -117,6 +155,10 @@ class TikTokShopClient {
       throw new Error(`TikTok Shop APIレスポンスをJSONとして読めません (${response.status}): ${text}`);
     }
     if (!response.ok || (data.code && data.code !== 0)) {
+      if (!options.retried && isTokenError(data, response)) {
+        await this.refreshAccessToken();
+        return this.getJson(pathTemplate, pathParams, extraQuery, { retried: true });
+      }
       throw new Error(`TikTok Shop APIエラー (${response.status}/${data.code ?? ''}): ${data.message || data.msg || text}`);
     }
     return data;
@@ -195,7 +237,19 @@ class TikTokShopClient {
     });
 
     const text = await response.text();
-    if (!response.ok) throw new Error(`TikTok Shop APIエラー (${response.status}): ${text}`);
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = null;
+    }
+    if (!response.ok || (data && data.code && data.code !== 0)) {
+      if (!options.retried && isTokenError(data, response)) {
+        await this.refreshAccessToken();
+        return this.submitTracking(order, { ...options, retried: true });
+      }
+      throw new Error(`TikTok Shop APIエラー (${response.status}/${data?.code ?? ''}): ${data?.message || data?.msg || text}`);
+    }
 
     return {
       ok: true,

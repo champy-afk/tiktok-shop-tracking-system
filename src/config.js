@@ -23,6 +23,7 @@ module.exports = {
     appSecret: process.env.TTS_APP_SECRET || '',
     authCode: process.env.TTS_AUTH_CODE || '',
     accessToken: process.env.TTS_ACCESS_TOKEN || '',
+    refreshToken: process.env.TTS_REFRESH_TOKEN || '',
     shopCipher: process.env.TTS_SHOP_CIPHER || '',
     warehouseId: process.env.TTS_WAREHOUSE_ID || '',
     deliveryOptionId: process.env.TTS_DELIVERY_OPTION_ID || '',
